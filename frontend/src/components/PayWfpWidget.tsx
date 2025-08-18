@@ -3,10 +3,11 @@ import React from 'react';
 const API_BASE = import.meta.env.VITE_API_URL as string;
 
 type Props = {
-  amountUAH: number;                // сума в гривнях (199.00)
-  productName: string;              // назва послуги
-  client?: { firstName?: string; phone?: string; email?: string }; // опц.
-  onSuccessRedirect?: string;       // куди перейти після Approved
+  amountUAH: number;
+  productName: string;
+  client?: { firstName?: string; phone?: string; email?: string };
+  onSuccessRedirect?: string;
+  disabled?: boolean; // НОВОЕ
 };
 
 function loadWfpScript(): Promise<void> {
@@ -22,33 +23,41 @@ function loadWfpScript(): Promise<void> {
   });
 }
 
-const PayWfpWidget: React.FC<Props> = ({ amountUAH, productName, client, onSuccessRedirect = '/pay/success' }) => {
+const PayWfpWidget: React.FC<Props> = ({
+  amountUAH,
+  productName,
+  client,
+  onSuccessRedirect = '/pay/success',
+  disabled
+}) => {
   const [loading, setLoading] = React.useState(false);
 
   const startPayment = async () => {
+    if (disabled || !Number.isFinite(amountUAH) || amountUAH <= 0) {
+      alert('Вкажіть суму або оберіть послугу.');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // 1) тягнемо підписані поля з твого бекенда
       const qs = new URLSearchParams({
         amount: amountUAH.toFixed(2),
         name: productName || 'Послуга',
       });
+
       const r = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`, {
         credentials: 'include',
       });
       if (!r.ok) throw new Error(`Create failed: ${r.status}`);
       const { fields, order_id } = await r.json();
 
-      // 2) підключаємо віджет
       await loadWfpScript();
       // @ts-ignore
       const Wayforpay = (window as any).Wayforpay;
       const wfp = new Wayforpay();
 
-      // 3) конвертуємо поля під формат віджета
       const payData: any = {
-        // підписані сервером значення
         merchantAccount: fields.merchantAccount,
         merchantDomainName: fields.merchantDomainName,
         merchantSignature: fields.merchantSignature,
@@ -65,24 +74,16 @@ const PayWfpWidget: React.FC<Props> = ({ amountUAH, productName, client, onSucce
         language: fields.language || 'UA',
       };
 
-      // (необов’язково) дані клієнта — показуються у формі WFP
       if (client?.firstName) payData.clientFirstName = client.firstName;
       if (client?.email)     payData.clientEmail = client.email;
       if (client?.phone)     payData.clientPhone = client.phone;
 
       if (order_id) sessionStorage.setItem('orderRef', order_id);
 
-      const onApproved = () => {
-        window.location.href = onSuccessRedirect;
-      };
-      const onDeclined = () => {
-        alert('Оплату відхилено. Спробуйте іншу картку/пізніше.');
-      };
-      const onPending = () => {
-        // очікує підтвердження 3-DS або банку
-      };
+      const onApproved = () => { window.location.href = onSuccessRedirect; };
+      const onDeclined = () => { alert('Оплату відхилено. Спробуйте іншу картку/пізніше.'); };
+      const onPending  = () => {};
 
-      // 4) запускаємо попап-віджет
       wfp.run(payData, onApproved, onDeclined, onPending);
     } catch (e) {
       console.error(e);
@@ -95,7 +96,7 @@ const PayWfpWidget: React.FC<Props> = ({ amountUAH, productName, client, onSucce
   return (
     <button
       onClick={startPayment}
-      disabled={loading}
+      disabled={!!disabled || loading}
       className="w-full bg-yellow-400 text-slate-800 px-8 py-3 rounded font-semibold hover:bg-yellow-300 transition-colors disabled:opacity-60"
     >
       {loading ? 'Відкриваємо віджет…' : 'Оплатити через WayForPay'}

@@ -69,10 +69,11 @@ const PaymentPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // сумма для виджета (и для формы, если не выбрана услуга)
+  // === ДОБАВЛЕНО: сумма для виджета/формы ===
   const amountUAH = selectedService ? calculatedAmount : parseUAH(formData.amount);
+  const widgetDisabled = !(amountUAH > 0);
 
-  // основной сабмит — создаем платёж и редиректим на WayForPay (через автосабмит формы)
+  // основной сабмит — создаем платёж и редиректим на WayForPay
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!API_BASE) {
@@ -87,7 +88,6 @@ const PaymentPage: React.FC = () => {
     try {
       setSubmitting(true);
 
-      // сумма: берём из выбранной услуги или из ручного поля
       const amountStr = amountUAH.toFixed(2);
       const serviceName = serviceById(selectedService)?.name || formData.service || 'Послуга';
 
@@ -102,10 +102,8 @@ const PaymentPage: React.FC = () => {
       if (!resp.ok) throw new Error(`Create payment failed: ${resp.status}`);
       const { action, fields, order_id } = await resp.json();
 
-      // збережемо orderRef — стане в пригоді на /pay/success
       if (order_id) sessionStorage.setItem('orderRef', order_id);
 
-      // автосабміт на WayForPay
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = action;
@@ -316,13 +314,14 @@ const PaymentPage: React.FC = () => {
                     }
                     client={{ firstName: formData.name, phone: formData.phone, email: formData.email }}
                     onSuccessRedirect="/pay/success"
+                    disabled={widgetDisabled}
                   />
                   <p className="text-xs text-gray-400 mt-2">
                     Оплата через WayForPay (віджет). Сума береться з вибраної послуги або з поля «Сума до оплати».
                   </p>
                 </div>
 
-                <div className="mt-4 p-4 bg-slate-600 rounded-lg">
+                <div className="mt-4 п-4 bg-slate-600 rounded-lg">
                   <div className="flex items-center text-yellow-400 mb-2">
                     <Shield className="w-4 h-4 mr-2" />
                     <span className="font-semibold">Безпечні платежі</span>

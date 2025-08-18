@@ -2,6 +2,7 @@ import React from 'react';
 import {
   CreditCard, Phone, Mail, Clock, CheckCircle, Shield, Calculator, FileText, Download
 } from 'lucide-react';
+import PayWfpWidget from '../components/PayWfpWidget';
 
 const API_BASE = import.meta.env.VITE_API_URL as string;
 
@@ -68,7 +69,10 @@ const PaymentPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // основной сабмит — создаем платёж и редиректим на WayForPay
+  // сумма для виджета (и для формы, если не выбрана услуга)
+  const amountUAH = selectedService ? calculatedAmount : parseUAH(formData.amount);
+
+  // основной сабмит — создаем платёж и редиректим на WayForPay (через автосабмит формы)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!API_BASE) {
@@ -84,10 +88,6 @@ const PaymentPage: React.FC = () => {
       setSubmitting(true);
 
       // сумма: берём из выбранной услуги или из ручного поля
-      const amountUAH = selectedService
-        ? calculatedAmount
-        : parseUAH(formData.amount);
-
       const amountStr = amountUAH.toFixed(2);
       const serviceName = serviceById(selectedService)?.name || formData.service || 'Послуга';
 
@@ -294,7 +294,7 @@ const PaymentPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Right column: methods/info/history (без изменений по логике) */}
+          {/* Right column: methods/info/history */}
           <div className="space-y-8">
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6">Способи оплати</h3>
@@ -305,6 +305,23 @@ const PaymentPage: React.FC = () => {
                     <span className="text-white">{method.name}</span>
                   </div>
                 ))}
+
+                {/* Кнопка WayForPay (виджет) */}
+                <div className="pt-2">
+                  <PayWfpWidget
+                    amountUAH={amountUAH}
+                    productName={
+                      services.find(s => s.id === selectedService)?.name ||
+                      formData.service || 'Послуга'
+                    }
+                    client={{ firstName: formData.name, phone: formData.phone, email: formData.email }}
+                    onSuccessRedirect="/pay/success"
+                  />
+                  <p className="text-xs text-gray-400 mt-2">
+                    Оплата через WayForPay (віджет). Сума береться з вибраної послуги або з поля «Сума до оплати».
+                  </p>
+                </div>
+
                 <div className="mt-4 p-4 bg-slate-600 rounded-lg">
                   <div className="flex items-center text-yellow-400 mb-2">
                     <Shield className="w-4 h-4 mr-2" />
@@ -364,7 +381,7 @@ const PaymentPage: React.FC = () => {
                   'Зберігайте чеки для звітності'
                 ].map((t) => (
                   <div key={t} className="flex items-start">
-                    <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
+                    <CheckCircle className="w-5 х-5 text-yellow-400 mr-3 mt-0.5" />
                     <span className="text-gray-300 text-sm">{t}</span>
                   </div>
                 ))}

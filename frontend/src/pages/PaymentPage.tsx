@@ -96,9 +96,7 @@ const PaymentPage: React.FC = () => {
         name: serviceName
       });
 
-      const resp = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`, {
-        credentials: 'include'
-      });
+      const resp = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`);
       if (!resp.ok) throw new Error(`Create payment failed: ${resp.status}`);
       const { action, fields, order_id } = await resp.json();
 

@@ -46,9 +46,7 @@ const PayWfpWidget: React.FC<Props> = ({
         name: productName || 'Послуга',
       });
 
-      const r = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`, {
-        credentials: 'include',
-      });
+      const r = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`);
       if (!r.ok) throw new Error(`Create failed: ${r.status}`);
       const { fields, order_id } = await r.json();
 

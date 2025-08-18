@@ -1,66 +1,138 @@
 import React from 'react';
-import { CreditCard, Phone, Mail, MapPin, Clock, CheckCircle, Shield, Calculator, FileText, Download } from 'lucide-react';
+import {
+  CreditCard, Phone, Mail, Clock, CheckCircle, Shield, Calculator, FileText, Download
+} from 'lucide-react';
 
-const PaymentPage = () => {
-  const [selectedService, setSelectedService] = React.useState('');
-  const [calculatedAmount, setCalculatedAmount] = React.useState(0);
-  
+const API_BASE = import.meta.env.VITE_API_URL as string;
+
+type Service = { id: string; name: string; price: string };
+
+const PaymentPage: React.FC = () => {
+  const [selectedService, setSelectedService] = React.useState<string>('');
+  const [calculatedAmount, setCalculatedAmount] = React.useState<number>(0);
+  const [submitting, setSubmitting] = React.useState(false);
+
   const [formData, setFormData] = React.useState({
     name: '',
     phone: '',
     email: '',
     service: '',
-    amount: '',
+    amount: '', // строка вида "500 грн"
     message: ''
   });
 
-  const services = [
-    { id: 'video', name: 'Відеоспостереження', price: '500 грн/міс' },
-    { id: 'intercom', name: 'Домофонна система', price: '300 грн/міс' },
-    { id: 'access', name: 'Контроль доступу', price: '400 грн/міс' },
-    { id: 'maintenance', name: 'Технічне обслуговування', price: '200 грн/міс' }
+  const services: Service[] = [
+    { id: 'video',        name: 'Відеоспостереження',  price: '500 грн/міс' },
+    { id: 'intercom',     name: 'Домофонна система',   price: '300 грн/міс' },
+    { id: 'access',       name: 'Контроль доступу',    price: '400 грн/міс' },
+    { id: 'maintenance',  name: 'Технічне обслуговування', price: '200 грн/міс' }
   ];
 
   const paymentMethods = [
-    { id: 'card', name: 'Банківська картка', icon: <CreditCard className="w-5 h-5" /> },
-    { id: 'bank', name: 'Банківський переказ', icon: <CreditCard className="w-5 h-5" /> },
-    { id: 'cash', name: 'Готівка', icon: <CreditCard className="w-5 h-5" /> },
-    { id: 'online', name: 'Онлайн банкінг', icon: <CreditCard className="w-5 h-5" /> }
+    { id: 'card',  name: 'Банківська картка',  icon: <CreditCard className="w-5 h-5" /> },
+    { id: 'bank',  name: 'Банківський переказ',icon: <CreditCard className="w-5 h-5" /> },
+    { id: 'cash',  name: 'Готівка',            icon: <CreditCard className="w-5 h-5" /> },
+    { id: 'online',name: 'Онлайн банкінг',     icon: <CreditCard className="w-5 h-5" /> }
   ];
 
   const paymentHistory = [
     { date: '15.01.2024', service: 'Відеоспостереження', amount: '500 грн', status: 'Оплачено' },
-    { date: '20.01.2024', service: 'Домофонна система', amount: '300 грн', status: 'Оплачено' },
+    { date: '20.01.2024', service: 'Домофонна система',  amount: '300 грн', status: 'Оплачено' },
     { date: '10.01.2024', service: 'Технічне обслуговування', amount: '200 грн', status: 'Оплачено' },
-    { date: '05.01.2024', service: 'Контроль доступу', amount: '400 грн', status: 'Оплачено' }
+    { date: '05.01.2024', service: 'Контроль доступу',   amount: '400 грн', status: 'Оплачено' }
   ];
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  // утилиты
+  const parseUAH = (s: string): number => {
+    // "500 грн" | "500" | "500,00" → 500.00 (число)
+    const normalized = s.replace(/[^\d.,]/g, '').replace(',', '.');
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
   };
-  
+
+  const serviceById = (id: string) => services.find(s => s.id === id);
+
   React.useEffect(() => {
-    const service = services.find(s => s.id === selectedService);
+    const service = serviceById(selectedService);
     if (service) {
-      const price = parseInt(service.price.replace(/[^\d]/g, ''));
-      setCalculatedAmount(price);
-      setFormData(prev => ({ ...prev, amount: `${price} грн` }));
+      const priceUAH = parseUAH(service.price);
+      setCalculatedAmount(priceUAH);
+      setFormData(prev => ({ ...prev, service: selectedService, amount: `${priceUAH} грн` }));
     }
   }, [selectedService]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // основной сабмит — создаем платёж и редиректим на WayForPay
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle payment submission
-    console.log('Payment form submitted:', formData);
-    alert('Дякуємо! Ваша заявка на оплату прийнята. Ми зв\'яжемося з вами найближчим часом.');
+    if (!API_BASE) {
+      alert('VITE_API_URL не налаштований');
+      return;
+    }
+    if (!formData.name || !formData.phone) {
+      alert('Заповніть імʼя та телефон');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      // сумма: берём из выбранной услуги или из ручного поля
+      const amountUAH = selectedService
+        ? calculatedAmount
+        : parseUAH(formData.amount);
+
+      const amountStr = amountUAH.toFixed(2);
+      const serviceName = serviceById(selectedService)?.name || formData.service || 'Послуга';
+
+      const qs = new URLSearchParams({
+        amount: amountStr,
+        name: serviceName
+      });
+
+      const resp = await fetch(`${API_BASE}/api/payments/wfp/create/?${qs.toString()}`, {
+        credentials: 'include'
+      });
+      if (!resp.ok) throw new Error(`Create payment failed: ${resp.status}`);
+      const { action, fields, order_id } = await resp.json();
+
+      // збережемо orderRef — стане в пригоді на /pay/success
+      if (order_id) sessionStorage.setItem('orderRef', order_id);
+
+      // автосабміт на WayForPay
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = action;
+
+      Object.entries(fields).forEach(([k, v]) => {
+        (Array.isArray(v) ? v : [v]).forEach(val => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = k;
+          input.value = String(val);
+          form.appendChild(input);
+        });
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+    } catch (err) {
+      console.error(err);
+      alert('Помилка під час створення платежу. Спробуйте пізніше.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-800 pt-20">
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="py-20 bg-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
@@ -77,126 +149,116 @@ const PaymentPage = () => {
           {/* Payment Form */}
           <div className="space-y-8">
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
-            <h2 className="text-2xl font-bold text-white mb-6">Форма оплати</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
+              <h2 className="text-2xl font-bold text-white mb-6">Форма оплати</h2>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-300 text-sm font-medium mb-2">Ім'я *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
+                      placeholder="Ваше ім'я"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 text-sm font-medium mb-2">Телефон *</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required
+                      className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
+                      placeholder="+38(067) 123 45 67"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-gray-300 text-sm font-medium mb-2">
-                    Ім'я *
-                  </label>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
+                    placeholder="your@email.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">Послуга *</label>
+                  <select
+                    name="service"
+                    value={formData.service}
+                    onChange={(e) => {
+                      handleInputChange(e);
+                      setSelectedService(e.target.value);
+                    }}
+                    required
+                    className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
+                  >
+                    <option value="">Оберіть послугу</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name} — {service.price}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">Сума до оплати *</label>
                   <input
                     type="text"
-                    name="name"
-                    value={formData.name}
+                    name="amount"
+                    value={formData.amount}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
-                    placeholder="Ваше ім'я"
+                    placeholder="500 грн"
                   />
+                  <p className="text-xs text-gray-400 mt-1">Можна залишити як є — підставляємо з обраної послуги.</p>
                 </div>
-                
+
                 <div>
-                  <label className="block text-gray-300 text-sm font-medium mb-2">
-                    Телефон *
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
+                  <label className="block text-gray-300 text-sm font-medium mb-2">Додаткова інформація</label>
+                  <textarea
+                    name="message"
+                    value={formData.message}
                     onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
-                    placeholder="+38(067) 123 45 67"
+                    rows={4}
+                    className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none resize-none"
+                    placeholder="Додаткові коментарі або побажання..."
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
-                  placeholder="your@email.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Послуга *
-                </label>
-                <select
-                  name="service"
-                  value={formData.service}
-                  onChange={(e) => { handleInputChange(e); setSelectedService(e.target.value); }}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-yellow-400 text-slate-800 px-8 py-3 rounded font-semibold hover:bg-yellow-300 transition-colors duration-200 disabled:opacity-60"
                 >
-                  <option value="">Оберіть послугу</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name} - {service.price}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {submitting ? 'Створюємо платіж…' : 'Оплатити карткою'}
+                </button>
+              </form>
+            </div>
 
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Сума до оплати *
-                </label>
-                <input
-                  type="text"
-                  name="amount"
-                  value={formData.amount}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none"
-                  placeholder="500 грн"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Додаткова інформація
-                </label>
-                <textarea
-                  name="message"
-                  value={formData.message}
-                  onChange={handleInputChange}
-                  rows={4}
-                  className="w-full px-4 py-3 bg-slate-600 text-white border border-slate-500 rounded-lg focus:border-yellow-400 focus:outline-none resize-none"
-                  placeholder="Додаткові коментарі або побажання..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-yellow-400 text-slate-800 px-8 py-3 rounded font-semibold hover:bg-yellow-300 transition-colors duration-200"
-              >
-                Подати заявку на оплату
-              </button>
-            </form>
-          </div>
-            
-            {/* Payment Calculator */}
+            {/* Calculator */}
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6 flex items-center">
                 <Calculator className="w-5 h-5 mr-2" />
                 Калькулятор вартості
               </h3>
-              
+
               <div className="space-y-4">
                 <div>
-                  <label className="block text-gray-300 text-sm font-medium mb-2">
-                    Оберіть послугу
-                  </label>
+                  <label className="block text-gray-300 text-sm font-medium mb-2">Оберіть послугу</label>
                   <select
                     value={selectedService}
                     onChange={(e) => setSelectedService(e.target.value)}
@@ -210,7 +272,7 @@ const PaymentPage = () => {
                     ))}
                   </select>
                 </div>
-                
+
                 {selectedService && (
                   <div className="bg-slate-600 rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
@@ -232,17 +294,14 @@ const PaymentPage = () => {
             </div>
           </div>
 
-          {/* Payment Methods & Info */}
+          {/* Right column: methods/info/history (без изменений по логике) */}
           <div className="space-y-8">
-            {/* Payment Methods */}
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6">Способи оплати</h3>
               <div className="space-y-4">
                 {paymentMethods.map((method) => (
                   <div key={method.id} className="flex items-center p-4 bg-slate-600 rounded-lg">
-                    <div className="text-yellow-400 mr-3">
-                      {method.icon}
-                    </div>
+                    <div className="text-yellow-400 mr-3">{method.icon}</div>
                     <span className="text-white">{method.name}</span>
                   </div>
                 ))}
@@ -258,7 +317,6 @@ const PaymentPage = () => {
               </div>
             </div>
 
-            {/* Contact Info */}
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6">Контактна інформація</h3>
               <div className="space-y-4">
@@ -277,61 +335,41 @@ const PaymentPage = () => {
               </div>
             </div>
 
-            {/* Payment History */}
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6">Історія платежів</h3>
               <div className="space-y-3">
-                {paymentHistory.map((payment, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-slate-600 rounded">
+                {paymentHistory.map((p, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-slate-600 rounded">
                     <div>
-                      <p className="text-white font-semibold">{payment.service}</p>
-                      <p className="text-gray-400 text-sm">{payment.date}</p>
+                      <p className="text-white font-semibold">{p.service}</p>
+                      <p className="text-gray-400 text-sm">{p.date}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-yellow-400 font-semibold">{payment.amount}</p>
-                      <span className="text-green-400 text-sm">{payment.status}</span>
+                      <p className="text-yellow-400 font-semibold">{p.amount}</p>
+                      <span className="text-green-400 text-sm">{p.status}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Payment Instructions */}
             <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
               <h3 className="text-xl font-bold text-white mb-6">Інструкції з оплати</h3>
               <div className="space-y-3">
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-                  <span className="text-gray-300 text-sm">
-                    Заповніть форму з вашими даними та оберіть послугу
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-                  <span className="text-gray-300 text-sm">
-                    Наш менеджер зв'яжеться з вами для підтвердження
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-                  <span className="text-gray-300 text-sm">
-                    Оплатіть зручним для вас способом
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-                  <span className="text-gray-300 text-sm">
-                    Отримайте підтвердження оплати
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-                  <span className="text-gray-300 text-sm">
-                    Зберігайте чеки для звітності
-                  </span>
-                </div>
+                {[
+                  'Заповніть форму з вашими даними та оберіть послугу',
+                  'Наш менеджер звʼяжеться з вами для підтвердження',
+                  'Оплатіть зручним для вас способом',
+                  'Отримайте підтвердження оплати',
+                  'Зберігайте чеки для звітності'
+                ].map((t) => (
+                  <div key={t} className="flex items-start">
+                    <CheckCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
+                    <span className="text-gray-300 text-sm">{t}</span>
+                  </div>
+                ))}
               </div>
-              
+
               <div className="mt-6 p-4 bg-slate-600 rounded-lg">
                 <h4 className="text-white font-semibold mb-2 flex items-center">
                   <FileText className="w-4 h-4 mr-2" />
@@ -345,26 +383,8 @@ const PaymentPage = () => {
                 </div>
               </div>
             </div>
-            
-            {/* FAQ */}
-            <div className="bg-slate-700 rounded-lg p-8 shadow-xl">
-              <h3 className="text-xl font-bold text-white mb-6">Часті питання</h3>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-white font-semibold mb-2">Як швидко обробляється платіж?</h4>
-                  <p className="text-gray-300 text-sm">Платежі картою обробляються миттєво, банківські перекази - протягом 1-2 робочих днів.</p>
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold mb-2">Чи можна налаштувати автоплатіж?</h4>
-                  <p className="text-gray-300 text-sm">Так, ви можете налаштувати автоматичне списання коштів в особистому кабінеті.</p>
-                </div>
-                <div>
-                  <h4 className="text-white font-semibold mb-2">Що робити, якщо платіж не пройшов?</h4>
-                  <p className="text-gray-300 text-sm">Зв'яжіться з нашою службою підтримки за телефоном +38(067) 164 06 33.</p>
-                </div>
-              </div>
-            </div>
           </div>
+
         </div>
       </div>
     </div>

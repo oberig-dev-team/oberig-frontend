@@ -26,6 +26,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         onClose();
         setEmail('');
         setPassword('');
+        console.log('success--------', success)
       } else {
         setError('Невірний email або пароль');
       }

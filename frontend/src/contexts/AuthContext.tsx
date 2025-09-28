@@ -141,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'admin',
         registrationDate: '2024-01-01'
       });
+      console.log('login success', user);
       return true;
     } else if (email === 'client@example.com' && password === 'client123') {
       setUser({

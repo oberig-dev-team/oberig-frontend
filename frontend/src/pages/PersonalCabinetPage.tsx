@@ -27,6 +27,10 @@ const PersonalCabinetPage = () => {
     return <Navigate to="/" replace />;
   } */
 
+ if (user) {
+  return <Navigate to='/persona-cabinet' />
+ }
+
   React.useEffect(() => {
     if (user) {
       setEditFormData({

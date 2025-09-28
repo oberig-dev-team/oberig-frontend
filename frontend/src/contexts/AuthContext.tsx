@@ -155,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       return true;
     }
+    console.log('login success', user);
     return false;
   };
 

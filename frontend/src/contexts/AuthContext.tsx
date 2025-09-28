@@ -153,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         address: 'м. Київ, вул. Хрещатик, 1',
         registrationDate: '2024-01-15'
       });
+      console.log('login success', user);
       return true;
     }
     console.log('login success', user);

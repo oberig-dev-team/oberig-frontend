@@ -38,7 +38,7 @@ interface Notification {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: User | null ;
   services: Service[];
   payments: Payment[];
   notifications: Notification[];
@@ -61,7 +61,7 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState();
   const [services, setServices] = useState<Service[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -156,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('login success', user);
       return true;
     }
-    console.log('login success', user);
     return false;
   };
 

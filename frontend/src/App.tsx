@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProductProvider } from './contexts/ProductContext';
@@ -13,7 +13,30 @@ import PersonalCabinetPage from './pages/PersonalCabinetPage';
 import PaymentPage from './pages/PaymentPage';
 import AdminPanel from './components/AdminPanel';
 
+/* interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'client' | 'admin';
+  address?: string;
+  registrationDate: string;
+} */
+
 function App() {
+
+  /* const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (user?.name.length !== undefined) {
+
+      console.log("Користувач залогінився:", user);
+    }
+    }, [user]); */
+  
+
+
+
   return (
     <AuthProvider>
       <ProductProvider>

@@ -54,6 +54,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  let newUser;
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
@@ -67,9 +68,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (user?.name.length !== undefined) {
+
       console.log("Користувач залогінився:", user);
     }
+    setUser(user);
   }, [user]);
 
 
@@ -151,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('login success', user);
       return true;
     } else if (email === 'client@example.com' && password === 'client123') {
-      const newUser = {
+      newUser = {
         id: 'client1',
         name: 'Олександр Петренко',
         email: 'client@example.com',

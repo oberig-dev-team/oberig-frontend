@@ -38,7 +38,7 @@ interface Notification {
 }
 
 interface AuthContextType {
-  user: User | null ;
+  user: User | null;
   services: Service[];
   payments: Payment[];
   notifications: Notification[];
@@ -61,10 +61,17 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState();
+  const [user, setUser] = useState<User | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      console.log("Користувач залогінився:", user);
+    }
+  }, [user]);
+
 
   // Initialize demo data
   useEffect(() => {
@@ -144,7 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('login success', user);
       return true;
     } else if (email === 'client@example.com' && password === 'client123') {
-      setUser({
+      const newUser = {
         id: 'client1',
         name: 'Олександр Петренко',
         email: 'client@example.com',
@@ -152,7 +159,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'client',
         address: 'м. Київ, вул. Хрещатик, 1',
         registrationDate: '2024-01-15'
-      });
+      };
+      setUser(newUser);
       console.log('login success', user);
       return true;
     }

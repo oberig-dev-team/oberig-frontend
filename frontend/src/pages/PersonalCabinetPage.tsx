@@ -23,9 +23,9 @@ const PersonalCabinetPage = () => {
   const { user, services, payments, notifications, updateProfile, markNotificationAsRead, addPayment } = useAuth();
 
   // Redirect if not logged in
-  if (!user) {
+/*   if (!user) {
     return <Navigate to="/" replace />;
-  }
+  } */
 
   React.useEffect(() => {
     if (user) {
